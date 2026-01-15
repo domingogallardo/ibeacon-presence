@@ -1,0 +1,63 @@
+Beacon Presence Notes (FDA50693-A4E2-4FB1-AFCF-C6EB07647825)
+
+Target beacon
+- UUID: FDA50693-A4E2-4FB1-AFCF-C6EB07647825
+- Major: 10011
+- Minor: 19641
+
+Calibration (latest)
+- Baseline median: -49 dBm (p25 -50 / p75 -46)
+- Away median: -80 dBm (p25 -82 / p75 -72)
+- Drop median: 31 dB; conservative drop: 22 dB
+- Adv interval p50: 1.4s, p90: 2.9s, p95: 4.8s, max: 8.6s
+
+Detector algorithm (current)
+- Keep per-beacon state: last_seen, rssi_filtered (EMA), present.
+- Start assumption: after first valid signal, assume present (no early "away").
+- Ads with RSSI >= --min-valid-rssi update last_seen (timeouts).
+- EMA is updated from any valid RSSI sample (within the global valid range).
+- Exit rule: two-stage timeout
+  - away accelerator: if rssi_filtered < --min-valid-rssi for --weak-seconds, declare away
+  - after --timeout: state stays present but reason becomes stale-hold
+  - after --away-timeout: declare away
+- Note: if --away-timeout < --timeout, stale-hold is skipped.
+
+Output behavior
+- While searching, prints detailed lines each second.
+- After presence is detected, prints one line per minute.
+- State changes (present/away/searching) always print immediately.
+- After first away, state stays away (no re-entry).
+
+Defaults (calibrated)
+- --min-valid-rssi -75
+- --weak-seconds 60
+- --timeout 113
+- --away-timeout 120
+- --ema-alpha 0.30
+- Presence timeouts from 4h gap study: T1=113s, T2=120s
+- Target behavior: pocket=present, leaving desk -> away via weak-rssi (EMA < -75 for 60s).
+
+Parameter meanings
+- --uuid / --major / --minor: target iBeacon identity.
+- --min-valid-rssi: ads below this RSSI are ignored for last_seen and also used for away acceleration.
+- --weak-seconds: seconds EMA must stay below the RSSI threshold before away.
+- --timeout (T1): age without ads to mark stale-hold (still present).
+- --away-timeout (T2): age without ads to declare away.
+- --ema-alpha: smoothing factor for RSSI EMA (higher = more reactive).
+
+Commands
+- Presence detector: swift run beacon
+
+Notes
+- If false away: increase --away-timeout.
+- If far/weak ads should be ignored: raise --min-valid-rssi.
+- If away triggers too fast: lower --min-valid-rssi (more negative) or increase --weak-seconds.
+- If startup is slow in the pocket: lower --min-valid-rssi (more negative).
+
+Example run (explicit flags)
+swift run beacon -- \
+  --uuid FDA50693-A4E2-4FB1-AFCF-C6EB07647825 \
+  --major 10011 --minor 19641 \
+  --min-valid-rssi -75 --weak-seconds 60 \
+  --timeout 113 --away-timeout 120 \
+  --ema-alpha 0.30
