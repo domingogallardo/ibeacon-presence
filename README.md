@@ -5,7 +5,7 @@ Swift CLI for beacon presence detection on macOS using CoreBluetooth.
 Behavior (current)
 - First valid ad => present.
 - Away if EMA stays below `--min-valid-rssi` for `--weak-seconds` OR no valid ads for `--away-timeout`.
-- First away is final (no re-entry).
+- On away, scanning pauses and prompts `Press enter to confirm your presence`, then restarts detection.
 
 Build and run
 ```

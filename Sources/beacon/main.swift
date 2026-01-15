@@ -29,7 +29,7 @@ final class BLEPresenceDetector: NSObject, CBCentralManagerDelegate {
     private var rssiFiltered: Double?
     private var lastState: PresenceState?
     private var firstPresenceConfirmed = false
-    private var awayLocked = false
+    private var awaitingPresenceConfirmation = false
     private let startTime: Date
     private var lastLoggedMinute: Int?
     private var weakSince: Date?
@@ -122,6 +122,13 @@ final class BLEPresenceDetector: NSObject, CBCentralManagerDelegate {
         print("[BLE] scanning started (tracking 1 beacon)")
     }
 
+    private func stopScanning() {
+        guard isScanning else { return }
+        isScanning = false
+        central.stopScan()
+        print("[BLE] scanning stopped (awaiting confirmation)")
+    }
+
     private func startReportTimerIfNeeded() {
         guard reportTimer == nil else { return }
         reportTimer = Timer.scheduledTimer(
@@ -158,10 +165,7 @@ final class BLEPresenceDetector: NSObject, CBCentralManagerDelegate {
         let state: PresenceState
         let reason: String
 
-        if awayLocked {
-            state = .away
-            reason = "locked"
-        } else if lastSeen == nil {
+        if lastSeen == nil {
             state = .searching
             reason = "no-signal"
         } else if !firstPresenceConfirmed {
@@ -172,11 +176,9 @@ final class BLEPresenceDetector: NSObject, CBCentralManagerDelegate {
             if weakTimedOut {
                 state = .away
                 reason = "weak-rssi"
-                awayLocked = true
             } else if let ageSeconds = ageSeconds, Double(ageSeconds) > awayTimeout {
                 state = .away
                 reason = "timeout"
-                awayLocked = true
             } else if let ageSeconds = ageSeconds, Double(ageSeconds) > timeout {
                 state = .present
                 reason = "stale-hold"
@@ -196,7 +198,8 @@ final class BLEPresenceDetector: NSObject, CBCentralManagerDelegate {
         let weakLabel = "weak=\(weakAge)s/\(Int(weakSeconds))s@\(minValidRssiThreshold)"
         let detailed = "[BLE] presence \(presenceLabel) (reason=\(reason), rssi=\(rssiLabel), rssiAvg=\(rssiAvgLabel), age=\(ageLabel)s, valid>=\(minValidRssiThreshold), \(weakLabel), timeout=\(timeoutLabel)s, awayTimeout=\(awayTimeoutLabel)s)"
 
-        if state == .searching || lastState == nil || lastState != state {
+        let stateChanged = state == .searching || lastState == nil || lastState != state
+        if stateChanged {
             print(detailed)
         } else if firstPresenceConfirmed {
             let minuteIndex = Int(now.timeIntervalSince(startTime) / 60) + 1
@@ -204,6 +207,11 @@ final class BLEPresenceDetector: NSObject, CBCentralManagerDelegate {
                 print("[BLE] minute \(minuteIndex): \(presenceLabel) (reason=\(reason), age=\(ageLabel)s, rssiAvg=\(rssiAvgLabel))")
                 lastLoggedMinute = minuteIndex
             }
+        }
+
+        if state == .away && lastState != .away {
+            pauseForPresenceConfirmation()
+            return
         }
         lastState = state
     }
@@ -250,6 +258,29 @@ final class BLEPresenceDetector: NSObject, CBCentralManagerDelegate {
             bytes[8], bytes[9],
             bytes[10], bytes[11], bytes[12], bytes[13], bytes[14], bytes[15]
         )
+    }
+
+    private func pauseForPresenceConfirmation() {
+        guard !awaitingPresenceConfirmation else { return }
+        awaitingPresenceConfirmation = true
+        stopScanning()
+        reportTimer?.invalidate()
+        reportTimer = nil
+        print("Press enter to confirm your presence")
+        _ = readLine()
+        resetPresenceState()
+        awaitingPresenceConfirmation = false
+        startScanningIfNeeded()
+    }
+
+    private func resetPresenceState() {
+        lastSeen = nil
+        lastRssi = nil
+        rssiFiltered = nil
+        lastState = nil
+        firstPresenceConfirmed = false
+        lastLoggedMinute = nil
+        weakSince = nil
     }
 }
 

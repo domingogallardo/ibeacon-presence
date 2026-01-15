@@ -26,7 +26,7 @@ Output behavior
 - While searching, prints detailed lines each second.
 - After presence is detected, prints one line per minute.
 - State changes (present/away/searching) always print immediately.
-- After first away, state stays away (no re-entry).
+- After away, scanning stops and waits for user confirmation before restarting detection.
 
 Defaults (calibrated)
 - --min-valid-rssi -75
