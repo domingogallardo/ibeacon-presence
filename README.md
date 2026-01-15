@@ -12,6 +12,11 @@ Build and run
 swift run beacon
 ```
 
+Scan for beacons (to discover UUID/major/minor before configuring the main CLI):
+```
+swift scripts/beacon_scan.swift
+```
+
 Flags
 - `--uuid <UUID>` / `--major <major>` / `--minor <minor>`
 - `--min-valid-rssi <dBm>`
