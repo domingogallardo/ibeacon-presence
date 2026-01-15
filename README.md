@@ -26,3 +26,8 @@ Flags
 - `--ema-alpha <0-1>`
 
 Notes and current defaults: `beacon_presence_notes.txt`
+
+Interactive scan
+```
+swift scripts/beacon_scan.swift
+```
