@@ -14,13 +14,11 @@ Calibration (latest)
 Detector algorithm (current)
 - Keep per-beacon state: last_seen, rssi_filtered (EMA), present.
 - Start assumption: after first valid signal, assume present (no early "away").
-- Ads with RSSI >= --min-valid-rssi update last_seen (timeouts).
+- Ads with RSSI >= --min-valid-rssi update last_seen.
 - EMA is updated from any valid RSSI sample (within the global valid range).
-- Exit rule: two-stage timeout
+- Exit rule
   - away accelerator: if rssi_filtered < --min-valid-rssi for --weak-seconds, declare away
-  - after --timeout: state stays present but reason becomes stale-hold
   - after --away-timeout: declare away
-- Note: if --away-timeout < --timeout, stale-hold is skipped.
 
 Output behavior
 - While searching, prints detailed lines each second.
@@ -31,18 +29,16 @@ Output behavior
 Defaults (calibrated)
 - --min-valid-rssi -75
 - --weak-seconds 60
-- --timeout 113
-- --away-timeout 120
+- --away-timeout 90
 - --ema-alpha 0.30
-- Presence timeouts from 4h gap study: T1=113s, T2=120s
+- Presence timeout from 4h gap study: 90s
 - Target behavior: pocket=present, leaving desk -> away via weak-rssi (EMA < -75 for 60s).
 
 Parameter meanings
 - --uuid / --major / --minor: target iBeacon identity.
 - --min-valid-rssi: ads below this RSSI are ignored for last_seen and also used for away acceleration.
 - --weak-seconds: seconds EMA must stay below the RSSI threshold before away.
-- --timeout (T1): age without ads to mark stale-hold (still present).
-- --away-timeout (T2): age without ads to declare away.
+- --away-timeout: age without ads to declare away.
 - --ema-alpha: smoothing factor for RSSI EMA (higher = more reactive).
 
 Commands
@@ -59,5 +55,5 @@ swift run beacon -- \
   --uuid FDA50693-A4E2-4FB1-AFCF-C6EB07647825 \
   --major 10011 --minor 19641 \
   --min-valid-rssi -75 --weak-seconds 60 \
-  --timeout 113 --away-timeout 120 \
+  --away-timeout 90 \
   --ema-alpha 0.30

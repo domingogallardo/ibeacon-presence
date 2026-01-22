@@ -248,7 +248,7 @@ final class PresenceTimeoutCalibrator: NSObject, CBCentralManagerDelegate {
         let s = summarize(gaps)
         let hist = histogram(gaps, binWidth: histogramBinWidth, maxSeconds: histogramMaxSeconds)
 
-        let suggestion = suggestTimeouts(
+        let suggestion = suggestAwayTimeout(
             gaps: gaps,
             durationSeconds: activeDuration,
             targetFalsePerDay: targetFalsePerDay,
@@ -269,9 +269,9 @@ final class PresenceTimeoutCalibrator: NSObject, CBCentralManagerDelegate {
         print("\(prefix) false/hour table: \(falsePerHourTable(durationSeconds: activeDuration))")
 
         if let suggestion = suggestion {
-            print("\(prefix) suggested presence timeouts (empirical, target false/day <= \(String(format: "%.3f", targetFalsePerDay))): T1=\(formatSeconds(suggestion.t1))s (est false/day ≈ \(String(format: "%.3f", suggestion.falsePerDayAtT1))) T2=\(formatSeconds(suggestion.t2))s")
+            print("\(prefix) suggested away-timeout (empirical, target false/day <= \(String(format: "%.3f", targetFalsePerDay))): \(formatSeconds(suggestion.awayTimeout))s (est false/day ≈ \(String(format: "%.3f", suggestion.falsePerDayAtAway)))")
         } else {
-            print("\(prefix) suggested timeouts: insufficient data to estimate reliably yet.")
+            print("\(prefix) suggested away-timeout: insufficient data to estimate reliably yet.")
         }
         csvHandle?.synchronizeFile()
     }
@@ -347,16 +347,15 @@ final class PresenceTimeoutCalibrator: NSObject, CBCentralManagerDelegate {
     }
 
     private struct TimeoutSuggestion {
-        let t1: TimeInterval
-        let t2: TimeInterval
-        let falsePerDayAtT1: Double
+        let awayTimeout: TimeInterval
+        let falsePerDayAtAway: Double
     }
 
-    private func suggestTimeouts(gaps: [TimeInterval],
-                                 durationSeconds: TimeInterval,
-                                 targetFalsePerDay: Double,
-                                 safetyMargin: TimeInterval,
-                                 maxSuggested: TimeInterval) -> TimeoutSuggestion? {
+    private func suggestAwayTimeout(gaps: [TimeInterval],
+                                    durationSeconds: TimeInterval,
+                                    targetFalsePerDay: Double,
+                                    safetyMargin: TimeInterval,
+                                    maxSuggested: TimeInterval) -> TimeoutSuggestion? {
         guard durationSeconds > 60, gaps.count >= 50 else { return nil }
 
         func falsePerDay(threshold: TimeInterval) -> Double {
@@ -376,20 +375,19 @@ final class PresenceTimeoutCalibrator: NSObject, CBCentralManagerDelegate {
             candidate += step
         }
 
-        let baseT1: TimeInterval
+        let baseThreshold: TimeInterval
         if let chosen = chosen {
-            baseT1 = chosen
+            baseThreshold = chosen
         } else {
-            baseT1 = min((gaps.max() ?? maxSuggested) + safetyMargin, maxSuggested)
+            baseThreshold = min((gaps.max() ?? maxSuggested) + safetyMargin, maxSuggested)
         }
 
-        let t1 = min(baseT1 + safetyMargin, maxSuggested)
-        let t2 = min(max(t1 * 2.0, t1 + 10.0), maxSuggested)
+        let threshold = min(baseThreshold + safetyMargin, maxSuggested)
+        let awayTimeout = min(max(threshold * 2.0, threshold + 10.0), maxSuggested)
 
         return TimeoutSuggestion(
-            t1: t1,
-            t2: t2,
-            falsePerDayAtT1: falsePerDay(threshold: baseT1)
+            awayTimeout: awayTimeout,
+            falsePerDayAtAway: falsePerDay(threshold: awayTimeout)
         )
     }
 

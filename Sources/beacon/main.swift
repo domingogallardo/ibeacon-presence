@@ -37,7 +37,6 @@ final class BLEPresenceDetector: NSObject, CBCentralManagerDelegate {
     private let target: BeaconKey
     private let minValidRssiThreshold: Int
     private let weakSeconds: TimeInterval
-    private let timeout: TimeInterval
     private let awayTimeout: TimeInterval
     private let emaAlpha: Double
 
@@ -45,14 +44,12 @@ final class BLEPresenceDetector: NSObject, CBCentralManagerDelegate {
         target: BeaconKey,
         minValidRssiThreshold: Int,
         weakSeconds: TimeInterval,
-        timeout: TimeInterval,
         awayTimeout: TimeInterval,
         emaAlpha: Double
     ) {
         self.target = target
         self.minValidRssiThreshold = minValidRssiThreshold
         self.weakSeconds = weakSeconds
-        self.timeout = timeout
         self.awayTimeout = awayTimeout
         self.emaAlpha = emaAlpha
         self.startTime = Date()
@@ -179,9 +176,6 @@ final class BLEPresenceDetector: NSObject, CBCentralManagerDelegate {
             } else if let ageSeconds = ageSeconds, Double(ageSeconds) > awayTimeout {
                 state = .away
                 reason = "timeout"
-            } else if let ageSeconds = ageSeconds, Double(ageSeconds) > timeout {
-                state = .present
-                reason = "stale-hold"
             } else {
                 state = .present
                 reason = "hold"
@@ -192,11 +186,10 @@ final class BLEPresenceDetector: NSObject, CBCentralManagerDelegate {
         let rssiLabel = lastRssi.map { String($0) } ?? "NA"
         let rssiAvgLabel = rssiFiltered.map { String(format: "%.1f", $0) } ?? "NA"
         let ageLabel = ageSeconds.map { String($0) } ?? "NA"
-        let timeoutLabel = String(format: "%.0f", timeout)
         let awayTimeoutLabel = String(format: "%.0f", awayTimeout)
         let weakAge = weakDuration.map { String(format: "%.0f", $0) } ?? "NA"
         let weakLabel = "weak=\(weakAge)s/\(Int(weakSeconds))s@\(minValidRssiThreshold)"
-        let detailed = "[BLE] presence \(presenceLabel) (reason=\(reason), rssi=\(rssiLabel), rssiAvg=\(rssiAvgLabel), age=\(ageLabel)s, valid>=\(minValidRssiThreshold), \(weakLabel), timeout=\(timeoutLabel)s, awayTimeout=\(awayTimeoutLabel)s)"
+        let detailed = "[BLE] presence \(presenceLabel) (reason=\(reason), rssi=\(rssiLabel), rssiAvg=\(rssiAvgLabel), age=\(ageLabel)s, valid>=\(minValidRssiThreshold), \(weakLabel), awayTimeout=\(awayTimeoutLabel)s)"
 
         let stateChanged = state == .searching || lastState == nil || lastState != state
         if stateChanged {
@@ -288,7 +281,6 @@ struct AppConfig {
     let target: BLEPresenceDetector.BeaconKey
     let minValidRssiThreshold: Int
     let weakSeconds: TimeInterval
-    let timeout: TimeInterval
     let awayTimeout: TimeInterval
     let emaAlpha: Double
 }
@@ -305,8 +297,7 @@ func parseConfig(from args: [String]) -> AppConfig {
     var minor = defaultTarget.minor
     var minValidRssiThreshold = -75
     var weakSeconds: TimeInterval = 60.0
-    var timeout: TimeInterval = 113.0
-    var awayTimeout: TimeInterval = 120.0
+    var awayTimeout: TimeInterval = 90
     var emaAlpha = 0.3
 
     var index = 0
@@ -340,12 +331,6 @@ func parseConfig(from args: [String]) -> AppConfig {
             }
             weakSeconds = value
             index += 2
-        case "--timeout":
-            guard index + 1 < args.count, let value = Double(args[index + 1]) else {
-                usageAndExit("invalid value for --timeout")
-            }
-            timeout = value
-            index += 2
         case "--away-timeout":
             guard index + 1 < args.count, let value = Double(args[index + 1]) else {
                 usageAndExit("invalid value for --away-timeout")
@@ -370,7 +355,6 @@ func parseConfig(from args: [String]) -> AppConfig {
         target: target,
         minValidRssiThreshold: minValidRssiThreshold,
         weakSeconds: weakSeconds,
-        timeout: timeout,
         awayTimeout: awayTimeout,
         emaAlpha: emaAlpha
     )
@@ -380,21 +364,17 @@ func usageAndExit(_ message: String? = nil) -> Never {
     if let message = message {
         print("[BLE] error: \(message)")
     }
-    print("[BLE] usage: swift run beacon -- --uuid <UUID> --major <major> --minor <minor> [--min-valid-rssi <dBm>] [--weak-seconds <seconds>] [--timeout <seconds>] [--away-timeout <seconds>] [--ema-alpha <0-1>]")
+    print("[BLE] usage: swift run beacon -- --uuid <UUID> --major <major> --minor <minor> [--min-valid-rssi <dBm>] [--weak-seconds <seconds>] [--away-timeout <seconds>] [--ema-alpha <0-1>]")
     exit(1)
 }
 
 let config = parseConfig(from: Array(CommandLine.arguments.dropFirst()))
-print("[BLE] tracking uuid=\(config.target.uuid) major=\(config.target.major) minor=\(config.target.minor) rssiThreshold>=\(config.minValidRssiThreshold) weakSeconds=\(Int(config.weakSeconds)) timeout(T1)=\(Int(config.timeout))s awayTimeout(T2)=\(Int(config.awayTimeout))s emaAlpha=\(String(format: "%.2f", config.emaAlpha))")
-if config.awayTimeout < config.timeout {
-    print("[BLE] note: away-timeout < timeout, stale-hold stage disabled")
-}
+print("[BLE] tracking uuid=\(config.target.uuid) major=\(config.target.major) minor=\(config.target.minor) rssiThreshold>=\(config.minValidRssiThreshold) weakSeconds=\(Int(config.weakSeconds)) awayTimeout=\(Int(config.awayTimeout))s emaAlpha=\(String(format: "%.2f", config.emaAlpha))")
 
 let detector = BLEPresenceDetector(
     target: config.target,
     minValidRssiThreshold: config.minValidRssiThreshold,
     weakSeconds: config.weakSeconds,
-    timeout: config.timeout,
     awayTimeout: config.awayTimeout,
     emaAlpha: config.emaAlpha
 )

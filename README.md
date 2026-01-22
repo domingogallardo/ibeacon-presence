@@ -21,7 +21,6 @@ Flags
 - `--uuid <UUID>` / `--major <major>` / `--minor <minor>`
 - `--min-valid-rssi <dBm>`
 - `--weak-seconds <seconds>`
-- `--timeout <seconds>`
 - `--away-timeout <seconds>`
 - `--ema-alpha <0-1>`
 

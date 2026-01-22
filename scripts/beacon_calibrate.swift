@@ -285,13 +285,13 @@ final class BeaconCalibration: NSObject, CBCentralManagerDelegate {
         let minValidRssi = clampRssi(minValidRssiRaw)
 
         let p95Interval = intervalStats?.p95 ?? 20.0
-        let recommendedTimeout = max(60, Int(ceil(p95Interval * 3.0)))
-        let recommendedAwayTimeout = recommendedTimeout + Int(ceil(p95Interval))
+        let baseTimeout = max(60, Int(ceil(p95Interval * 3.0)))
+        let recommendedAwayTimeout = baseTimeout + Int(ceil(p95Interval))
         let recommendedWeakSeconds = max(20, Int(ceil(p95Interval * 2.0)))
         let recommendedEmaAlpha = 0.30
 
         let emaLabel = String(format: "%.2f", recommendedEmaAlpha)
-        let suggested = "[BLE] swift run beacon -- --min-valid-rssi \(minValidRssi) --weak-seconds \(recommendedWeakSeconds) --timeout \(recommendedTimeout) --away-timeout \(recommendedAwayTimeout) --ema-alpha \(emaLabel)"
+        let suggested = "[BLE] swift run beacon -- --min-valid-rssi \(minValidRssi) --weak-seconds \(recommendedWeakSeconds) --away-timeout \(recommendedAwayTimeout) --ema-alpha \(emaLabel)"
         print("[BLE] suggested flags:")
         print(suggested)
 
