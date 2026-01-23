@@ -18,27 +18,30 @@ Detector algorithm (current)
 - EMA is updated from any valid RSSI sample (within the global valid range).
 - Exit rule
   - away accelerator: if rssi_filtered < --min-valid-rssi for --weak-seconds, declare away
-  - after --away-timeout: declare away
+  - after --away-timeout: declare away only if rssi_filtered has been below --min-valid-rssi for --weak-prime-seconds; otherwise stay present (stale-hold)
 
 Output behavior
 - While searching, prints detailed lines each second.
 - After presence is detected, prints one line per minute.
 - State changes (present/away/searching) always print immediately.
 - After away, scanning stops and waits for user confirmation before restarting detection.
+- If Bluetooth turns off, scanning stops and resumes automatically when it turns back on.
 
 Defaults (calibrated)
-- --min-valid-rssi -75
-- --weak-seconds 60
+- --min-valid-rssi -70
+- --weak-seconds 30
+- --weak-prime-seconds 20
 - --away-timeout 90
 - --ema-alpha 0.30
-- Presence timeout from 4h gap study: 90s
-- Target behavior: pocket=present, leaving desk -> away via weak-rssi (EMA < -75 for 60s).
+- Presence timeout from 4h gap study: 90s (gated by weak-prime-seconds)
+- Target behavior: pocket=present, leaving desk -> away via weak-rssi (EMA < -70 for 30s).
 
 Parameter meanings
 - --uuid / --major / --minor: target iBeacon identity.
 - --min-valid-rssi: ads below this RSSI are ignored for last_seen and also used for away acceleration.
 - --weak-seconds: seconds EMA must stay below the RSSI threshold before away.
-- --away-timeout: age without ads to declare away.
+- --weak-prime-seconds: seconds EMA must stay below the RSSI threshold to allow timeout away.
+- --away-timeout: age without ads to declare away (if weak-prime is satisfied).
 - --ema-alpha: smoothing factor for RSSI EMA (higher = more reactive).
 
 Commands
@@ -46,6 +49,7 @@ Commands
 
 Notes
 - If false away: increase --away-timeout.
+- If away triggers after brief weak signal: increase --weak-prime-seconds.
 - If far/weak ads should be ignored: raise --min-valid-rssi.
 - If away triggers too fast: lower --min-valid-rssi (more negative) or increase --weak-seconds.
 - If startup is slow in the pocket: lower --min-valid-rssi (more negative).
@@ -54,6 +58,7 @@ Example run (explicit flags)
 swift run beacon -- \
   --uuid FDA50693-A4E2-4FB1-AFCF-C6EB07647825 \
   --major 10011 --minor 19641 \
-  --min-valid-rssi -75 --weak-seconds 60 \
+  --min-valid-rssi -70 --weak-seconds 30 \
+  --weak-prime-seconds 20 \
   --away-timeout 90 \
   --ema-alpha 0.30

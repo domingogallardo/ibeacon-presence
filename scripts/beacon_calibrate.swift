@@ -283,15 +283,23 @@ final class BeaconCalibration: NSObject, CBCentralManagerDelegate {
 
         let minValidRssiRaw = Int(round((baselineStats.p25 + awayStats.p75) / 2.0))
         let minValidRssi = clampRssi(minValidRssiRaw)
+        print("[BLE] min-valid-rssi range: [\(Int(round(awayStats.p75))), \(Int(round(baselineStats.p25)))] -> suggested \(minValidRssi)")
+        let baselineBelow = baselineSamples.filter { $0 < minValidRssi }.count
+        let awayAbove = awaySamples.filter { $0 >= minValidRssi }.count
+        let baselineBelowPct = (Double(baselineBelow) / Double(max(baselineSamples.count, 1))) * 100.0
+        let awayAbovePct = (Double(awayAbove) / Double(max(awaySamples.count, 1))) * 100.0
+        print("[BLE] min-valid-rssi check: baseline< \(baselineBelow)/\(baselineSamples.count) (\(formatPercent(baselineBelowPct))) away>= \(awayAbove)/\(awaySamples.count) (\(formatPercent(awayAbovePct)))")
 
         let p95Interval = intervalStats?.p95 ?? 20.0
         let baseTimeout = max(60, Int(ceil(p95Interval * 3.0)))
         let recommendedAwayTimeout = baseTimeout + Int(ceil(p95Interval))
         let recommendedWeakSeconds = max(20, Int(ceil(p95Interval * 2.0)))
+        let recommendedWeakPrimeSeconds = max(10, Int(ceil(p95Interval * 4.0)))
         let recommendedEmaAlpha = 0.30
 
         let emaLabel = String(format: "%.2f", recommendedEmaAlpha)
-        let suggested = "[BLE] swift run beacon -- --min-valid-rssi \(minValidRssi) --weak-seconds \(recommendedWeakSeconds) --away-timeout \(recommendedAwayTimeout) --ema-alpha \(emaLabel)"
+        print("[BLE] weak-prime-seconds hint: p95 interval \(format(p95Interval))s -> ~4 ads = \(recommendedWeakPrimeSeconds)s")
+        let suggested = "[BLE] swift run beacon -- --min-valid-rssi \(minValidRssi) --weak-seconds \(recommendedWeakSeconds) --weak-prime-seconds \(recommendedWeakPrimeSeconds) --away-timeout \(recommendedAwayTimeout) --ema-alpha \(emaLabel)"
         print("[BLE] suggested flags:")
         print(suggested)
 
@@ -376,6 +384,10 @@ final class BeaconCalibration: NSObject, CBCentralManagerDelegate {
 
     private func format(_ value: Double) -> String {
         return String(format: "%.1f", value)
+    }
+
+    private func formatPercent(_ value: Double) -> String {
+        return String(format: "%.1f%%", value)
     }
 
     private func isValidRssi(_ value: Int) -> Bool {
